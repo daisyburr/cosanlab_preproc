@@ -31,7 +31,8 @@ def get_ants_templates():
         'OASIS_BrainCerebellumRegistrationMask.nii.gz']]
     return imgs
 
-
+def get_ants_settings():
+    return
 
 
 def get_n_slices(volume):
