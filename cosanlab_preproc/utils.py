@@ -1,6 +1,6 @@
 """Handy utilities"""
 
-__all__ = ['get_resource_path','get_anatomical','get_n_slices','get_ta','get_slice_order','get_n_volumes','get_vox_dims']
+__all__ = ['get_resource_path','get_mni_template','get_n_slices','get_ta','get_slice_order','get_n_volumes','get_vox_dims']
 __author__ = ["Luke Chang"]
 __license__ = "MIT"
 
@@ -12,9 +12,27 @@ def get_resource_path():
     """ Get path to nltools resource directory. """
     return join(dirname(__file__), 'resources') + pathsep
 
-def get_anatomical():
-    """ Get nltools default anatomical image. """
-    return nib.load(os.path.join(get_resource_path(),'MNI152_T1_2mm.nii.gz'))
+def get_mni_template(mm='2'):
+    """ Get MNI template image in specified resolution. """
+    if mm == '1':
+        file_path =  nib.load(os.path.join(get_resource_path(),'MNI152_T1_1mm.nii.gz'))
+    elif mm == '2':
+        file_path =  nib.load(os.path.join(get_resource_path(),'MNI152_T1_2mm.nii.gz'))
+    elif mm == '3':
+        file_path =  nib.load(os.path.join(get_resource_path(),'MNI152_T1_3mm.nii.gz'))
+    else:
+        raise ValueError("Uknown MNI resolution provided!")
+    return file_path
+
+def get_ants_templates():
+    imgs = [nib.load(os.path.join(get_resource_path(),img)) for img in [
+        'OASIS_BrainCerebellumExtractionMask.nii.gz',
+        'OASIS_BrainCerebellumProbabilityMask.nii.gz',
+        'OASIS_BrainCerebellumRegistrationMask.nii.gz']]
+    return imgs
+
+
+
 
 def get_n_slices(volume):
     """ Get number of volumes of image. """
@@ -36,7 +54,7 @@ def get_slice_order(volume):
     n_slices = nii.get_shape()[2]
     return range(1,n_slices+1)
 
-def get_n_volumes(volume):   
+def get_n_volumes(volume):
     """ Get number of volumes of image. """
 
     import nibabel as nib
@@ -56,5 +74,3 @@ def get_vox_dims(volume):
     hdr = nii.get_header()
     voxdims = hdr.get_zooms()
     return [float(voxdims[0]), float(voxdims[1]), float(voxdims[2])]
-
-
