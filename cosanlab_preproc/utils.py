@@ -25,14 +25,18 @@ def get_mni_template(mm='2'):
     return file_path
 
 def get_ants_templates():
-    imgs = [nib.load(os.path.join(get_resource_path(),img)) for img in [
-        'OASIS_BrainCerebellumExtractionMask.nii.gz',
+    imgs = [os.path.join(get_resource_path(),img) for img in [
+        'OASIS_template.nii.gz',
         'OASIS_BrainCerebellumProbabilityMask.nii.gz',
         'OASIS_BrainCerebellumRegistrationMask.nii.gz']]
     return imgs
 
 def get_ants_settings():
-    return
+    settings_files = [os.path.join(get_resource_path(),f) for f in [
+        'ANTS_normalization_settings.json',
+        'ANTS_applyTransform_settings.json'
+    ]]
+    return settings_files
 
 
 def get_n_slices(volume):

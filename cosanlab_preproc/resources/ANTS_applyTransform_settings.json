@@ -1,0 +1,7 @@
+{
+    "dimension": 3,
+    "environ": {},
+    "float": false,
+    "interpolation": "Linear",
+    "invert_transform_flags": [false, false]
+}
