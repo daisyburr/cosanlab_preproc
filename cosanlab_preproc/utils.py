@@ -1,12 +1,13 @@
 """Handy utilities"""
 
-__all__ = ['get_resource_path','get_mni_template','get_n_slices','get_ta','get_slice_order','get_n_volumes','get_vox_dims']
+__all__ = ['get_resource_path','get_mni_template','get_n_slices','get_ta','get_slice_order','get_n_volumes','get_vox_dims','get_subject_data','split_text']
 __author__ = ["Luke Chang"]
 __license__ = "MIT"
 
 from os.path import dirname, join, pardir, sep as pathsep
 import nibabel as nib
 import os
+from bids.grabbids import BIDSLayout
 
 def get_resource_path():
     """ Get path to nltools resource directory. """
@@ -79,3 +80,60 @@ def get_vox_dims(volume):
     hdr = nii.get_header()
     voxdims = hdr.get_zooms()
     return [float(voxdims[0]), float(voxdims[1]), float(voxdims[2])]
+
+def get_subject_data(data_dir, subject_id, session = None, extension='nii.gz'):
+    """
+    Complete subject query from BIDS dataset. Borrowed and modified from fmriprep/niworkflows.
+    https://github.com/poldracklab/fmriprep/blob/master/fmriprep/utils/bids.py
+    Called by workflow builder.
+    """
+    layout = BIDSLayout(data_dir)
+    assert subject_id in layout.get_subjects(), "Subject not found in BIDS directory!"
+
+    if session:
+        queries = {
+            'fmap': {'subject': subject_id,'session':session, 'modality': 'fmap',
+                     'extensions': [extension]},
+            'bold': {'subject': subject_id,'session':session, 'modality': 'func', 'type': 'bold',
+                     'extensions': [extension]},
+            'sbref': {'subject': subject_id,'session':session, 'modality': 'func', 'type': 'sbref',
+                      'extensions': [extension]},
+            't2w': {'subject': subject_id,'session':session, 'type': 'T2w',
+                    'extensions': [extension]},
+            't1w': {'subject': subject_id,'session':session, 'type': 'T1w',
+                    'extensions': [extension]},
+        }
+    else:
+        queries = {
+            'fmap': {'subject': subject_id, 'modality': 'fmap',
+                     'extensions': [extension]},
+            'bold': {'subject': subject_id,'modality': 'func', 'type': 'bold',
+                     'extensions': [extension]},
+            'sbref': {'subject': subject_id,'modality': 'func', 'type': 'sbref',
+                      'extensions': [extension]},
+            't2w': {'subject': subject_id,'type': 'T2w',
+                    'extensions': [extension]},
+            't1w': {'subject': subject_id,'type': 'T1w',
+                    'extensions': [extension]},
+        }
+
+    data = {modality: [x.filename for x in layout.get(**query)]
+            for modality, query in queries.items()}
+    if len(data['t1w']) == 0:
+        raise IOError("Subject anatomical not found!")
+    elif len(data['t1w']) > 1:
+        raise NotImplementedError("Cannot current handle multiple subject anatomicals!")
+    assert len(data['bold']) > 0, "Subject functional(s) not found!"
+
+    return data
+
+def splitext(fname):
+    """
+    Borrowed from fmriprep:
+    https://github.com/poldracklab/fmriprep/blob/master/fmriprep/interfaces/bids.py
+    """
+    fname, ext = os.path.splitext(os.path.basename(fname))
+    if ext == '.gz':
+        fname, ext2 = os.path.splitext(fname)
+        ext = ext2 + ext
+    return fname, ext
