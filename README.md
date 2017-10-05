@@ -11,8 +11,9 @@ Data is expected to be the [BIDS](http://bids.neuroimaging.io/) standard format.
 - an output directory to save results
 - the id of a subject to process
 
-##Simple usage
-###Performs
+##Simple usage  
+
+###Performs  
 - Brain extraction, registration, normalization to MNI152 3mm (ANTS)
 - HMC (FSL)
 - Smoothing at 6mm
@@ -26,8 +27,9 @@ wf = workflow_builder(
     )
 wf.run()
 ```
-##More customized usage
-###Performs
+##More customized usage  
+
+###Performs  
 - Brain extraction, registration, normalization to MNI152 *2mm* (ANTS)
 - Segmentation (WM, CSF, GM also normalized to MNI152) (FSL)
 - Distortion correction (FSL)
