@@ -8,7 +8,7 @@ Classes for various nipype interfaces
 
 '''
 
-__all__ = ['Plot_Coregistration_Montage', 'Plot_Realignment_Parameters', 'Create_Covariates', 'Down_Sample_Precision','Low_Pass_Filter']
+__all__ = ['Plot_Coregistration_Montage', 'Plot_Realignment_Parameters', 'Create_Covariates', 'Down_Sample_Precision','Low_Pass_Filter', 'BIDSOutput','BIDSInput']
 __author__ = ["Luke Chang"]
 __license__ = "MIT"
 
@@ -16,12 +16,20 @@ import matplotlib
 matplotlib.use('Agg')
 import pandas as pd
 import numpy as np
-#import pylab as plt
 import os
+import re
+import gzip
+import os.path as op
+from shutil import copy, copyfileobj
 import nibabel as nib
-from nipype.interfaces.base import isdefined, BaseInterface, TraitedSpec, File, traits
+from nipype.interfaces.base import BaseInterface, TraitedSpec, File, traits, BaseInterfaceInputSpec, Str, OutputMultiPath, SimpleInterface, InputMultiPath, isdefined
 from nilearn import plotting, image
-#from nltools.data import Brain_Data
+from cosanlab_preproc.utils import get_subject_data, split_text
+
+BIDS_NAME = re.compile(
+    '^(.*\/)?(?P<subject_id>sub-[a-zA-Z0-9]+)(_(?P<session_id>ses-[a-zA-Z0-9]+))?'
+    '(_(?P<task_id>task-[a-zA-Z0-9]+))?(_(?P<acq_id>acq-[a-zA-Z0-9]+))?'
+    '(_(?P<rec_id>rec-[a-zA-Z0-9]+))?(_(?P<run_id>run-[a-zA-Z0-9]+))?')
 
 class Plot_Coregistration_Montage_InputSpec(TraitedSpec):
     wra_img = File(exists=True, mandatory=True)
@@ -326,7 +334,6 @@ class Low_Pass_Filter(BaseInterface):
     	outputs["out_file"] = os.path.abspath(self._out_file)
     	return outputs
 
-
 class Create_Covariates_InputSpec(TraitedSpec):
     realignment_parameters = File(exists=True, mandatory=True)
     spike_id = File(exists=True, mandatory=True)
@@ -370,3 +377,127 @@ class Create_Covariates(BaseInterface):
     	outputs = self._outputs().get()
     	outputs["covariates"] = os.path.abspath(self._covariates)
     	return outputs
+
+class BIDSInputInputSpec(BaseInterfaceInputSpec):
+    data_dir = traits.Directory(exists=True, mandatory=True)
+    subject_id = traits.Str(mandatory=True)
+
+class BIDSInputOutputSpec(TraitedSpec):
+    fmap = OutputMultiPath(desc='output fieldmaps')
+    bold = OutputMultiPath(desc='output functional images')
+    sbref = OutputMultiPath(desc='output sbrefs')
+    t1w = OutputMultiPath(desc='output T1w images')
+    t2w = OutputMultiPath(desc='output T2w images')
+
+class BIDSInput(SimpleInterface):
+    """
+    Collect files from a BIDS directory structure.
+    Essentially wraps cosanlab_preproc.utils.get_subject_data
+    """
+    input_spec = BIDSInputInputSpec
+    output_spec = BIDSInputOutputSpec
+
+    def _run_interface(self,runtime):
+        subject_data = get_subject_data(self.inputs.data_dir,
+        self.inputs.subject_id)
+
+        self._fmap = subject_data['fmap']
+        self._bold = subject_data['bold']
+        self._sbref = subject_data['sbref']
+        self._t1w = subject_data['t1w']
+        self._t2w = subject_data['t2w']
+
+        runtime.returncode=0
+    	return runtime
+
+    def _list_outputs(self):
+    	outputs = self._outputs().get()
+    	outputs["fmap"] = self._fmap
+        outputs["bold"] = self._bold
+        outputs["sbref"] = self._sbref
+        outputs["t1w"] = self._t1w
+        outputs["t2w"] = self._t2w
+    	return outputs
+
+class BIDSOutputInputSpec(BaseInterfaceInputSpec):
+    base_directory = traits.Directory(
+        desc='Path to the base directory for storing data.')
+    in_file = InputMultiPath(File(exists=True), mandatory=True,
+                             desc='the object to be saved')
+    source_file = File(exists=False, mandatory=True, desc='the input func file')
+    suffix = traits.Str('', mandatory=True, desc='suffix appended to source_file')
+    extra_values = traits.List(traits.Str)
+
+class BIDSOutputOutputSpec(TraitedSpec):
+    out_file = OutputMultiPath(File(exists=True, desc='written file path'))
+
+class BIDSOutput(SimpleInterface):
+    """
+    Saves the `in_file` into a BIDS-Derivatives folder provided
+    by `base_directory`, given the input reference `source_file`.
+    Borrowed from fmriprep DerivativesDataSink:
+    https://github.com/poldracklab/fmriprep/blob/master/fmriprep/interfaces/bids.py
+    """
+    input_spec = BIDSOutputInputSpec
+    output_spec = BIDSOutputOutputSpec
+    _always_run = True
+
+    def __init__(self, out_path_base=None, **inputs):
+        super(BIDSOutput, self).__init__(**inputs)
+        self._results['out_file'] = []
+        if out_path_base:
+            self.out_path_base = out_path_base
+
+    def _run_interface(self, runtime):
+        src_fname, _ = split_text(self.inputs.source_file)
+        _, ext = split_text(self.inputs.in_file[0])
+        compress = ext == '.nii'
+        if compress:
+            ext = '.nii.gz'
+
+        m = BIDS_NAME.search(src_fname)
+
+        mod = 'func'
+        if 'anat' in op.dirname(self.inputs.source_file):
+            mod = 'anat'
+        elif 'dwi' in op.dirname(self.inputs.source_file):
+            mod = 'dwi'
+        elif 'fmap' in op.dirname(self.inputs.source_file):
+            mod = 'fmap'
+
+        base_directory = os.getcwd()
+        if isdefined(self.inputs.base_directory):
+            base_directory = op.abspath(self.inputs.base_directory)
+
+        out_path = '{}/{subject_id}'.format(self.out_path_base, **m.groupdict())
+        if m.groupdict().get('session_id') is not None:
+            out_path += '/{session_id}'.format(**m.groupdict())
+        out_path += '/{}'.format(mod)
+
+        out_path = op.join(base_directory, out_path)
+
+        os.makedirs(out_path, exist_ok=True)
+
+        base_fname = op.join(out_path, src_fname)
+
+        formatstr = '{bname}_{suffix}{ext}'
+        if len(self.inputs.in_file) > 1 and not isdefined(self.inputs.extra_values):
+            formatstr = '{bname}_{suffix}{i:04d}{ext}'
+
+        for i, fname in enumerate(self.inputs.in_file):
+            out_file = formatstr.format(
+                bname=base_fname,
+                suffix=self.inputs.suffix,
+                i=i,
+                ext=ext)
+            if isdefined(self.inputs.extra_values):
+                out_file = out_file.format(extra_value=self.inputs.extra_values[i])
+            self._results['out_file'].append(out_file)
+            if compress:
+                with open(fname, 'rb') as f_in:
+                    with gzip.open(out_file, 'wb') as f_out:
+                        copyfileobj(f_in, f_out)
+            else:
+                copy(fname, out_file)
+
+        return runtime
