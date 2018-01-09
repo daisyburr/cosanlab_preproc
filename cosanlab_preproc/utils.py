@@ -1,7 +1,7 @@
 """Handy utilities"""
 
 __all__ = ['get_resource_path','get_mni_template','get_n_slices','get_ta','get_slice_order','get_n_volumes','get_vox_dims','get_subject_data','split_text']
-__author__ = ["Luke Chang"]
+__author__ = ["Eshin Jolly", "Luke Chang"]
 __license__ = "MIT"
 
 from os.path import dirname, join, pardir, sep as pathsep
@@ -16,11 +16,11 @@ def get_resource_path():
 def get_mni_template(mm='2'):
     """ Get MNI template image in specified resolution. """
     if mm == '1':
-        file_path =  nib.load(os.path.join(get_resource_path(),'MNI152_T1_1mm.nii.gz'))
+        file_path = os.path.join(get_resource_path(),'MNI152_T1_1mm.nii.gz')
     elif mm == '2':
-        file_path =  nib.load(os.path.join(get_resource_path(),'MNI152_T1_2mm.nii.gz'))
+        file_path = os.path.join(get_resource_path(),'MNI152_T1_2mm.nii.gz')
     elif mm == '3':
-        file_path =  nib.load(os.path.join(get_resource_path(),'MNI152_T1_3mm.nii.gz'))
+        file_path = os.path.join(get_resource_path(),'MNI152_T1_3mm.nii.gz')
     else:
         raise ValueError("Uknown MNI resolution provided!")
     return file_path
@@ -38,7 +38,6 @@ def get_ants_settings():
         'ANTS_applyTransform_settings.json'
     ]]
     return settings_files
-
 
 def get_n_slices(volume):
     """ Get number of volumes of image. """
@@ -127,7 +126,7 @@ def get_subject_data(data_dir, subject_id, session = None, extension='nii.gz'):
 
     return data
 
-def splitext(fname):
+def split_text(fname):
     """
     Borrowed from fmriprep:
     https://github.com/poldracklab/fmriprep/blob/master/fmriprep/interfaces/bids.py

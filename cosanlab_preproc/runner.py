@@ -9,7 +9,7 @@ Preprocessing Workflow Runner
 __all__ = [
     'workflow_builder'
 ]
-__author__ = ['Eshin Jolly']
+__author__ = ["Eshin Jolly"]
 __license__ = 'MIT'
 
 import os
@@ -128,7 +128,9 @@ def workflow_builder(
 
     #BIDS INPUT -> FUNCTIONAL WF
     complete_wf.connect([
-        (bids_input,func_wf,[('bold','inputnode.func_image')])
+        (bids_input,func_wf,
+        [('bold','inputnode.func_image'),
+         ('fmap','inputnode.fmap')])
     ])
 
     #ANATOMICAL WF -> NORMALIZATION WF

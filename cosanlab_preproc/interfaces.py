@@ -1,15 +1,15 @@
 from __future__ import division
 
 '''
-Preproc Nipype Interfaces
-=========================
+Custom Nipype Interfaces
+========================
 
 Classes for various nipype interfaces
 
 '''
 
 __all__ = ['Plot_Coregistration_Montage', 'Plot_Realignment_Parameters', 'Create_Covariates', 'Down_Sample_Precision','Low_Pass_Filter', 'BIDSOutput','BIDSInput']
-__author__ = ["Luke Chang"]
+__author__ = ["Eshin Jolly","Luke Chang"]
 __license__ = "MIT"
 
 import matplotlib
@@ -22,7 +22,7 @@ import gzip
 import os.path as op
 from shutil import copy, copyfileobj
 import nibabel as nib
-from nipype.interfaces.base import BaseInterface, TraitedSpec, File, traits, BaseInterfaceInputSpec, Str, OutputMultiPath, SimpleInterface, InputMultiPath, isdefined
+from nipype.interfaces.base import BaseInterface, TraitedSpec, File, traits, BaseInterfaceInputSpec, Str, OutputMultiPath, InputMultiPath, isdefined
 from nilearn import plotting, image
 from cosanlab_preproc.utils import get_subject_data, split_text
 
@@ -389,7 +389,7 @@ class BIDSInputOutputSpec(TraitedSpec):
     t1w = OutputMultiPath(desc='output T1w images')
     t2w = OutputMultiPath(desc='output T2w images')
 
-class BIDSInput(SimpleInterface):
+class BIDSInput(BaseInterface):
     """
     Collect files from a BIDS directory structure.
     Essentially wraps cosanlab_preproc.utils.get_subject_data
@@ -431,7 +431,7 @@ class BIDSOutputInputSpec(BaseInterfaceInputSpec):
 class BIDSOutputOutputSpec(TraitedSpec):
     out_file = OutputMultiPath(File(exists=True, desc='written file path'))
 
-class BIDSOutput(SimpleInterface):
+class BIDSOutput(BaseInterface):
     """
     Saves the `in_file` into a BIDS-Derivatives folder provided
     by `base_directory`, given the input reference `source_file`.

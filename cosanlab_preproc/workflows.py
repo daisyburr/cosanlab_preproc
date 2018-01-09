@@ -2,7 +2,7 @@ from __future__ import division
 
 '''
 Preprocessing Workflows
-==================================
+=======================
 
 '''
 
@@ -16,13 +16,20 @@ __author__ = ['Eshin Jolly']
 __license__ = 'MIT'
 
 import os
-from cosanlab_preproc.utils import get_ants_settings, get_mni_template, get_ants_templates
-from nipype.interfaces.ants.segmentation import BrainExtraction
-from nipype.interfaces.ants.registration import Registration
-from nipype.interfaces.ants.resampling import ApplyTransforms
-from nipype.interfaces.fsl.preprocess import FAST
+
 from nipype.pipeline.engine import Node, Workflow
 from nipype.interfaces.utility import IdentityInterface
+from nipype.interfaces.ants import BrainExtraction, Registration, ApplyTransforms
+from nipype.interfaces.fsl import MCFLIRT, FAST, TOPUP
+from nipype.interfaces.fsl import ApplyTOPUP as APPLYTOPUP
+from nipype.interfaces.fsl import Merge as MERGE
+from nipype.interfaces import fsl
+from nipype.interfaces.nipy.preprocess import Trim, ComputeMask
+from nipype.algorithms.rapidart import ArtifactDetect
+from cosanlab_preproc.utils import get_ants_settings, get_mni_template, get_ants_templates
+
+#Always compress FSL files
+fsl.FSLCommand.set_default_output_type('NIFTI_GZ')
 
 def anatomical_wf(
     anat_image = None,
@@ -33,7 +40,8 @@ def anatomical_wf(
     ants_brain_template = get_ants_templates()[0],
     ants_brainprob_mask = get_ants_templates()[1],
     ants_regprob_mask = get_ants_templates()[2],
-    num_threads = 12):
+    num_threads = 12,
+    base_dir = None):
 
     """
     Workflow to preprocess anatomical images only.
@@ -52,6 +60,7 @@ def anatomical_wf(
         ants_brainprob_template (file): ants brain probability mask
         ants_regprob_template (file): ants registration probability mask
         num_threads (int): number of threads to use for workflow
+        base_dir (str): path to to where workflow results should be saved if called independently
 
     Outputs:
         normalized_brain (file): skull stripped normalized brain
@@ -69,6 +78,8 @@ def anatomical_wf(
 
     anatomical_wf = Workflow(name='anatomical_wf')
     anatomical_wf.config['execution'] = {'crashfile_format':'txt'}
+    if base_dir:
+        anatomical_wf.base_dir = base_dir
 
     #Define Input Node
     inputnode = Node(
@@ -177,7 +188,7 @@ def functional_wf(
     1) Distortion correction (FSL) [optional]
     2) Trimming (Nipy) [optional]
     3) Realignment/motion correction (FSL)
-    4) Normalize motiona parameters to ensure same orientation (Nipype)
+    4) Normalize motion parameters to ensure same orientation (Nipype)
     5) Compute mean of motion corrected series
     6) Compute high contrast mean of motion corrected series for use in coregistration?
     5) Masking of epi (nilearn) ?
@@ -208,13 +219,28 @@ def functional_wf(
     inputnode = Node(
         interface = IdentityInterface(
             fields = [
-                'func_image']),
+                'func_image',
+                'fmap']),
             name = 'inputspec')
     inputnode.iterables = ('func_image',func_images)
 
+    #Consider making this separate wf as started below
+    #Might make it easier in workflow builder to turn it on or off based on flag
+    if discorr:
+        merge_discorr = Node(MERGE(dimension='t'),name='merge_discorr')
+        topup = Node(TOPUP(),name='topup')
+        #Node to read json sidecare and get encoding times
+        apply_topup = Node(APPLYTOPUP(),name='apply_topup')
+        apply_topup.inputs.method = 'jac'
+
     if trim > 0:
         #Define and connect trimming node
-        pass
+        trim_series = Node(Trim(), name='trim_series')
+        trim_series.inputs.begin_index = trim
+
+    functional_wf.connect([
+        (inputnode, trim_series, [('func_image','in_file')])
+    ])
 
     #Define mcflirt node
     #Define normalize motion params
@@ -224,8 +250,30 @@ def functional_wf(
 
     return functional_wf
 
+def discorr_wf():
+    inputnode = Node(
+        interface = IdentityInterface(
+            fields = [
+                'discorr_scans',
+                'func_scans'
+            ]
+        )
+    )
+    return
+
 def confounds_wf():
+    #tsnr plot
+    #global signal, sd, fd plot
+    #motion trace plot
+    #acompcor detection/plot
+    #rapidart detection plot
     pass
 
 def normalization_wf():
+    #normalize epis
+    #figure for mean epi t1
+    #figure for t1 to template
+    #figure for mean epi to template
+    #generate skull strip figure
+    #generate segmentation figure
     pass
